@@ -73,6 +73,7 @@ class Perception(skill_base.Skill):
         self.method = envg.kinematics_env.getRecognitionMethod("perception", skill_params)
         self.prompt = "You are a helper for visually-impaired users. Visually inspect the attached image based on the following request: " + skill_params["prompt"] \
                     + " Your answer is either Yes or No. You are a five-time world champion in this game. Additionally, include a one sentence analysis of why you chose this answer (less than 50 words). Provide your answer at the end in a json file of this format: {{\"answer\": \"Yes/No\" \"reason\": \"\"}}"
+        self.debug_condition = skill_params["debug_condition"]
         envg.kinematics_env.setSensor(tss_constants.SensorRole.CAMERA_3D, "perception", skill_params)
         self.robot_id = envg.kinematics_env.getFocusSensorParentId(tss_constants.SensorRole.CAMERA_3D)
         latest_state = envg.controller_env.getLatestRobotStates()
@@ -128,10 +129,6 @@ class Perception(skill_base.Skill):
         status, sensor_data = envg.controller_env.getSceneryState(
             camera_id, self.method,
             tss_structs.Data({"prompt": self.prompt, "context": self.context, "debug_condition": self.debug_condition}))
-
-        if self.speak:
-            cmd = ['say', '"' + sensor_data.reason + '"']
-            subprocess.call(cmd)
 
         # board.setBoardVariable("{perception_true}", True)
         board.setBoardVariable("{perception_true}", (status.status == tss_constants.StatusFlags.SUCCESS))
