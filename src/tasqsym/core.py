@@ -265,6 +265,9 @@ async def standalone_mode(config_url: str, bt_file: str):
     print(f"   📝 Message: {status.message}")
     print(f"   🔚 Last node: {tsd.log_last_executed_node_name}")
     print(f"   🔢 Last pointer: {tsd.log_last_executed_node_id}")
+    await asyncio.sleep(5)  # let it run a bit
+    status = await rsi.cancelTask(envg, emergency=False)
+    print("Abort status:", status)
     import pdb; pdb.set_trace()  # for debugging purposes, remove in production
 
 

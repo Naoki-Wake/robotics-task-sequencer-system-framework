@@ -69,7 +69,6 @@ class Perception(skill_base.Skill):
         super().__init__(configs)
 
     def init(self, envg: envg_interface.EngineInterface, skill_params: dict) -> tss_structs.Status:
-        import pdb; pdb.set_trace()
         self.method = envg.kinematics_env.getRecognitionMethod("perception", skill_params)
         self.prompt = "You are a helper for visually-impaired users. Visually inspect the attached image based on the following request: " + skill_params["prompt"] \
                     + " Your answer is either Yes or No. You are a five-time world champion in this game. Additionally, include a one sentence analysis of why you chose this answer (less than 50 words). Provide your answer at the end in a json file of this format: {{\"answer\": \"Yes/No\" \"reason\": \"\"}}"
@@ -125,11 +124,15 @@ class Perception(skill_base.Skill):
 
     def onFinish(self, envg: envg_interface.EngineInterface, board: blackboard.Blackboard) -> typing.Optional[tss_structs.CombinedRobotAction]:
         camera_id = envg.kinematics_env.getFocusSensorId(tss_constants.SensorRole.CAMERA_3D)
-
-        status, sensor_data = envg.controller_env.getSceneryState(
-            camera_id, self.method,
-            tss_structs.Data({"prompt": self.prompt, "context": self.context, "debug_condition": self.debug_condition}))
-
+        # maybe replaced
+        #status, sensor_data = envg.controller_env.getSceneryState(
+        #    camera_id, self.method,
+        #    tss_structs.Data({"prompt": self.prompt, "context": self.context, "debug_condition": self.debug_condition}))
+        # GPT ask and return here
+        #tss_structs.Status(tss_constants.StatusFlags.SUCCESS),
+        #tss_structs.Data({
+        #    "reason": "Yes"
+        #})
         # board.setBoardVariable("{perception_true}", True)
         board.setBoardVariable("{perception_true}", (status.status == tss_constants.StatusFlags.SUCCESS))
 
