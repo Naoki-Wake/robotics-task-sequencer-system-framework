@@ -11,6 +11,10 @@ String paths are used instead of instances so that information can be sent betwe
 """
 
 library = {
+    "perception": {
+        "decoder": path + "perception.perception.PerceptionDecoder",
+        "src":     path + "perception.perception.Perception",
+    },
 
     "prepare": {
         "decoder": path + "prepare.prepare.PrepareDecoder",

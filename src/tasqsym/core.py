@@ -207,6 +207,20 @@ async def distribute_mode(default_tssconfig: str, network_client):
 
 
 async def standalone_mode(config_url: str, bt_file: str):
+    async def monitor_progress():
+        while not run_tree.done():
+            #img = get_simulation_img()
+            # You might want to extract the current task name or ID somehow
+            current_task = tsd.log_last_executed_node_name  # ← modify this as needed
+            node_pointer = tsd.log_last_executed_node_id  # ← modify this as needed
+            # if not visual_check_progress(img, current_task):
+            #    print("Visual check failed. Aborting...")
+            #    status = await rsi.cancelTask(envg, emergency=False)
+            #    print("Abort status:", status)
+            #    return
+            print(f"<<<<<<<<<Current task: {current_task}>>>>>>>>>")
+            print(f"<<<<<<<<<Current node pointer: {node_pointer}>>>>>>>>>")
+            await asyncio.sleep(1.0)  # check every 1 second
 
     with open(config_url) as f: configs = json.load(f)
 
@@ -238,11 +252,24 @@ async def standalone_mode(config_url: str, bt_file: str):
     with open(bt_file) as f: bt = json.load(f)
 
     run_tree = asyncio.create_task(tsd.runTree(bt, board, rsi, envg))
+    monitor_task = asyncio.create_task(monitor_progress())
+
+
+    print("Abort status:", status)
     await run_tree
+    await monitor_task
+    completion = (status.status == tss_constants.StatusFlags.SUCCESS)
+    print(">> Execution completed!")
+    print(f"   ✔️ Success: {completion}")
+    print(f"   📄 Error Code: {status.status.name}")
+    print(f"   📝 Message: {status.message}")
+    print(f"   🔚 Last node: {tsd.log_last_executed_node_name}")
+    print(f"   🔢 Last pointer: {tsd.log_last_executed_node_id}")
+    import pdb; pdb.set_trace()  # for debugging purposes, remove in production
 
 
 if __name__ == "__main__":
-
+    print("YEAHHHHHHHHHHHHHHH!")
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--credentials", help="credentials file")
