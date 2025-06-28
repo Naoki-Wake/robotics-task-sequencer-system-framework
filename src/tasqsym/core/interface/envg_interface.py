@@ -244,7 +244,7 @@ class EngineInterface:
 
         return: success or errors if any
         """
-        print("callEnvironmentUpdatePipeline")
+        #print("callEnvironmentUpdatePipeline")
 
         world_state = world_format.WorldStruct(
             world_format.CombinedRobotStruct(
@@ -261,7 +261,7 @@ class EngineInterface:
         updated_state = await get_desired_states
 
         if updated_state.status.status != tss_constants.StatusFlags.SUCCESS:
-            print(updated_state.status.message)
+            #print(updated_state.status.message)
             return updated_state.status
         
         """
@@ -271,7 +271,7 @@ class EngineInterface:
         updated_state = await execute_actions
 
         if updated_state.status.status != tss_constants.StatusFlags.SUCCESS:
-            print("aborted engine pipeline at controller engine!")
+            #print("aborted engine pipeline at controller engine!")
             return updated_state.status
 
         """
@@ -283,14 +283,14 @@ class EngineInterface:
             update_env = asyncio.create_task(self.physics_sim.update(updated_state))
             updated_state = await update_env
             if updated_state.status.status != tss_constants.StatusFlags.SUCCESS:
-                print("aborted engine pipeline at physics engine!")
+                #print("aborted engine pipeline at physics engine!")
                 return updated_state.status
 
         if self.rendering_sim is not None:
             update_env = asyncio.create_task(self.rendering_sim.update(updated_state))
             updated_state = await update_env
             if updated_state.status.status != tss_constants.StatusFlags.SUCCESS:
-                print("aborted engine pipeline at rendering engine!")
+                #print("aborted engine pipeline at rendering engine!")
                 return updated_state.status
 
         self.latest_component_states = copy.deepcopy(updated_state.component_states)

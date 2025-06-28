@@ -40,7 +40,7 @@ class DecoderAbstract(ABC):
 
         return: success status
         """
-        print("skill decoder warning: fillRuntimeParameters not implemented, assuming no runtime parameters")
+        #print("skill decoder warning: fillRuntimeParameters not implemented, assuming no runtime parameters")
         return tss_structs.Status(tss_constants.StatusFlags.SUCCESS)
 
     @abstractmethod

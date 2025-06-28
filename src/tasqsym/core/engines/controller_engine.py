@@ -176,7 +176,7 @@ class ControllerEngine(ControllerEngineBase):
             else: raise Exception("ControllerEngine encountered unknown type!")
 
         """Execute control methods."""
-        print('controller engine info: sending controls ...')
+        #print('controller engine info: sending controls ...')
         self.control_task = asyncio.gather(*controls, return_exceptions=False)
         try:
             success_flags: list[tss_structs.Status] = await self.control_task
@@ -186,7 +186,7 @@ class ControllerEngine(ControllerEngineBase):
                 if s.status != tss_constants.StatusFlags.SUCCESS:
                     status.message += '; ' + s.message
         except asyncio.CancelledError:
-            print('controller engine info: cancelling controls ...')
+            #print('controller engine info: cancelling controls ...')
             self.control_task = None
 
             # emergency stop
@@ -215,7 +215,7 @@ class ControllerEngine(ControllerEngineBase):
                     aborts.append(self.robots[unique_id].abortControlCommand())
             await asyncio.gather(*aborts, return_exceptions=False)
             status = tss_structs.Status(tss_constants.StatusFlags.ABORTED)
-        print('controller engine info: finished controls')
+        #print('controller engine info: finished controls')
 
         """Update states for the later pipeline."""
         update_task = asyncio.create_task(self.updateActualRobotStates())

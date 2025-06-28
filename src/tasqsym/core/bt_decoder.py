@@ -79,7 +79,10 @@ class TaskSequenceDecoder:
         for node in nodes:
             control_node = asyncio.create_task(self.parseControl(node, board, rsi, envg, node_id))
             status = await control_node
-            if status.status != tss_constants.StatusFlags.SUCCESS: return status
+            if status.status != tss_constants.StatusFlags.SUCCESS: 
+                node_information = "(NODE_NAME: " + self.log_last_executed_node_name + ", NODE_ID: " + str(self.log_last_executed_node_id) + ")"
+                status.message += " LOG: " + node_information
+                return status
             node_id[-1] += 1
         return tss_structs.Status(tss_constants.StatusFlags.SUCCESS)
 

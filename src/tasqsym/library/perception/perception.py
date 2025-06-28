@@ -15,7 +15,55 @@ import tasqsym.core.interface.envg_interface as envg_interface
 
 import tasqsym.core.classes.skill_base as skill_base
 import tasqsym.core.classes.skill_decoder as skill_decoder
+from . import gpt_video_checker as gpt_handler
 
+import numpy as np
+import cv2
+import roslibpy
+import base64
+import time
+import json
+
+
+def get_image_from_topic(topic="/isaacsim/rgb/compressed", timeout=30):
+    ros = roslibpy.Ros(host='localhost', port=9091)
+    ros.run(timeout)
+    if not ros.is_connected:
+        raise RuntimeError("Unable to connect to rosbridge_server at localhost:9091")
+
+    result = {'image': None}
+    done = False
+    start_time = time.time()
+
+    def callback(msg):
+        nonlocal done  # ← Move this to the top of the function
+        if not done:
+            try:
+                img_bytes = base64.b64decode(msg['data'])
+                np_arr = np.frombuffer(img_bytes, np.uint8)
+                image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                result['image'] = image
+                done = True
+            except Exception as e:
+                print(f"[ERROR] Failed to decode image: {e}")
+
+    isaac_ctrl = roslibpy.Topic(ros, '/isaacsim/control', 'std_msgs/String')
+    isaac_ctrl.publish({'data': 'stream_rgb'})
+    topic_sub = roslibpy.Topic(ros, topic, 'sensor_msgs/CompressedImage')
+    topic_sub.subscribe(callback)
+    while not done and (time.time() - start_time < timeout):
+        time.sleep(0.1)
+
+    topic_sub.unsubscribe()
+    isaac_ctrl.publish({'data': 'stop_rgb'})
+    time.sleep(0.1)
+    isaac_ctrl.unadvertise()
+    #ros.terminate()
+
+    if result['image'] is None:
+        raise TimeoutError(f"No image received from {topic} within {timeout} seconds.")
+
+    return result['image']
 
 class PerceptionDecoder(skill_decoder.Decoder):
 
@@ -51,7 +99,30 @@ class PerceptionDecoder(skill_decoder.Decoder):
         if "@context" in encoded_params: self.context = encoded_params["@context"]
 
         self.decoded = True
-        return tss_structs.Status(tss_constants.StatusFlags.SUCCESS)
+
+        send_prompt = "You are a helper for visually-impaired users. Visually inspect the attached image based on the following request: " + encoded_params["@prompt"] \
+                    + " Your answer is either Yes or No. You are a five-time world champion in this game. Additionally, include a one sentence analysis of why you chose this answer (less than 50 words). Provide your answer at the end in a json file of this format: {\"answer\": \"Yes/No\" \"reason\": \"\"}"
+        client, client_params = gpt_handler.init_vlm_client("/repos/robotics-task-sequencer-system-framework/src/tasqsym/library/perception/auth.env")
+        #frames_candidate = gpt_handler.open_image("/repos/robotics-task-sequencer-system-framework/src/tasqsym/library/perception/grid.png")
+        image = get_image_from_topic("/isaacsim/rgb/compressed")
+        #import pdb;pdb.set_trace()
+        progress = gpt_handler.ask_gpt(
+            client, client_params,
+            send_prompt,
+            [image]  # Assuming a single image for simplicity
+        )
+         # convert the text to json
+        progress_json = json.loads(progress)
+        # save image to a file
+        date = time.strftime("%Y%m%d-%H%M%S")
+        file_name = "/repos/robotics-task-sequencer-system-framework/src/tasqsym/library/perception/perception_image_" + date + ".jpg"
+        cv2.imwrite(file_name, image)
+        print(progress_json)
+        if "yes" in progress_json["answer"].lower():
+            return tss_structs.Status(tss_constants.StatusFlags.SUCCESS, message="Perception skill decoder successfully decoded parameters.")
+        else:
+            return tss_structs.Status(tss_constants.StatusFlags.FAILED, message="Perception skill decoder failed to decode parameters. The reason was: " + progress_json["reason"])
+        #return tss_structs.Status(tss_constants.StatusFlags.SUCCESS, message="Perception skill decoder successfully decoded parameters.")
 
     def asConfig(self) -> dict:
         return {
@@ -123,18 +194,9 @@ class Perception(skill_base.Skill):
             )
 
     def onFinish(self, envg: envg_interface.EngineInterface, board: blackboard.Blackboard) -> typing.Optional[tss_structs.CombinedRobotAction]:
-        camera_id = envg.kinematics_env.getFocusSensorId(tss_constants.SensorRole.CAMERA_3D)
-        # maybe replaced
-        #status, sensor_data = envg.controller_env.getSceneryState(
-        #    camera_id, self.method,
-        #    tss_structs.Data({"prompt": self.prompt, "context": self.context, "debug_condition": self.debug_condition}))
-        # GPT ask and return here
-        #tss_structs.Status(tss_constants.StatusFlags.SUCCESS),
-        #tss_structs.Data({
-        #    "reason": "Yes"
-        #})
+
         # board.setBoardVariable("{perception_true}", True)
-        board.setBoardVariable("{perception_true}", (status.status == tss_constants.StatusFlags.SUCCESS))
+        # board.setBoardVariable("{perception_true}", (status.status == tss_constants.StatusFlags.SUCCESS))
 
         envg.kinematics_env.freeSensors(tss_constants.SensorRole.CAMERA_3D)
 

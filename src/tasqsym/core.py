@@ -14,7 +14,9 @@ import tasqsym.core.interface.blackboard as blackboard
 import tasqsym.core.interface.envg_interface as envg_interface
 import tasqsym.core.interface.skill_interface as skill_interface
 import tasqsym.core.bt_decoder as bt_decoder
-
+import tasqsym.core.gpt_debugger as gpt_handler
+import ast
+import time
 
 async def distribute_mode(default_tssconfig: str, network_client):
     global run_tree
@@ -207,21 +209,7 @@ async def distribute_mode(default_tssconfig: str, network_client):
 
 
 async def standalone_mode(config_url: str, bt_file: str):
-    async def monitor_progress():
-        while not run_tree.done():
-            #img = get_simulation_img()
-            # You might want to extract the current task name or ID somehow
-            current_task = tsd.log_last_executed_node_name  # ← modify this as needed
-            node_pointer = tsd.log_last_executed_node_id  # ← modify this as needed
-            # if not visual_check_progress(img, current_task):
-            #    print("Visual check failed. Aborting...")
-            #    status = await rsi.cancelTask(envg, emergency=False)
-            #    print("Abort status:", status)
-            #    return
-            print(f"<<<<<<<<<Current task: {current_task}>>>>>>>>>")
-            print(f"<<<<<<<<<Current node pointer: {node_pointer}>>>>>>>>>")
-            await asyncio.sleep(1.0)  # check every 1 second
-
+    date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     with open(config_url) as f: configs = json.load(f)
 
     cfl = config_loader.ConfigLoader()
@@ -252,27 +240,49 @@ async def standalone_mode(config_url: str, bt_file: str):
     with open(bt_file) as f: bt = json.load(f)
 
     run_tree = asyncio.create_task(tsd.runTree(bt, board, rsi, envg))
-    monitor_task = asyncio.create_task(monitor_progress())
+    bt_status = await run_tree
+    retry_count = 0
+    while True:   
+        if bt_status.status != tss_constants.StatusFlags.SUCCESS:
+            print("Error during execution:", bt_status.message)
+            client, client_params = gpt_handler.init_vlm_client("/repos/robotics-task-sequencer-system-framework/src/tasqsym/library/perception/auth.env")
+            new_bt_list_txt = gpt_handler.ask_gpt(client, client_params, str(bt), bt_status.message)
+            # remove ```python and ``` from the start and end of the string
+            try:
+                new_bt_list_txt = new_bt_list_txt.replace("```python", "").replace("```", "").strip()
+                new_bt_list = ast.literal_eval(new_bt_list_txt)
+            except Exception as e:
+                import pdb; pdb.set_trace()
+            new_bt = {
+                "root": {
+                    "BehaviorTree": {
+                        "ID": "MainTree",
+                        "Reason": bt_status.message,
+                        "Tree": new_bt_list
+                    }
+                }
+            }
+            print("New behavior tree generated:")
 
-
-    print("Abort status:", status)
-    await run_tree
-    await monitor_task
-    completion = (status.status == tss_constants.StatusFlags.SUCCESS)
-    print(">> Execution completed!")
-    print(f"   ✔️ Success: {completion}")
-    print(f"   📄 Error Code: {status.status.name}")
-    print(f"   📝 Message: {status.message}")
-    print(f"   🔚 Last node: {tsd.log_last_executed_node_name}")
-    print(f"   🔢 Last pointer: {tsd.log_last_executed_node_id}")
+            json.dumps(new_bt, indent=4)
+            # write the new behavior tree to a file
+            retry_count += 1
+            with open(f"src/tasqsym/new_bt_{date}_{retry_count}.json", "w") as f:
+                json.dump(new_bt, f, indent=4)
+            print("Running the new behavior tree...")
+            #board = blackboard.Blackboard()
+            bt = new_bt  # update the bt to the new one
+            run_tree = asyncio.create_task(tsd.runTree(bt, board, rsi, envg))
+            bt_status = await run_tree
+        else:
+            print("Behavior tree executed successfully!")
+            break
     await asyncio.sleep(5)  # let it run a bit
-    status = await rsi.cancelTask(envg, emergency=False)
-    print("Abort status:", status)
-    import pdb; pdb.set_trace()  # for debugging purposes, remove in production
+    status = await rsi.cancelTask(envg, "emergency")
+
 
 
 if __name__ == "__main__":
-    print("YEAHHHHHHHHHHHHHHH!")
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--credentials", help="credentials file")
